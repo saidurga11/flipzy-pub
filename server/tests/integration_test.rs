@@ -6,13 +6,14 @@ use std::time::Duration;
 
 struct TestServer {
     process: Option<Child>,
+    port: u16,
 }
 
 impl TestServer {
-    fn start() -> Self {
-        let mut process = Command::new("cargo")
+    fn start(port: u16) -> Self {
+        let process = Command::new("cargo")
             .args(&["run"])
-            .env("PORT", "8081")
+            .env("PORT", port.to_string())
             .env("JWT_SECRET", "test-secret")
             .spawn()
             .expect("Failed to start server");
@@ -22,7 +23,12 @@ impl TestServer {
 
         TestServer {
             process: Some(process),
+            port,
         }
+    }
+
+    fn url(&self) -> String {
+        format!("http://localhost:{}", self.port)
     }
 }
 
@@ -36,11 +42,11 @@ impl Drop for TestServer {
 
 #[tokio::test]
 async fn test_health_endpoint_returns_200() {
-    let _server = TestServer::start();
+    let server = TestServer::start(8081);
 
     let client = reqwest::Client::new();
     let response = client
-        .get("http://localhost:8081/health")
+        .get(format!("{}/health", server.url()))
         .send()
         .await
         .expect("Failed to send request");
@@ -54,11 +60,11 @@ async fn test_health_endpoint_returns_200() {
 
 #[tokio::test]
 async fn test_guest_auth_endpoint() {
-    let _server = TestServer::start();
+    let server = TestServer::start(8082);
 
     let client = reqwest::Client::new();
     let response = client
-        .post("http://localhost:8081/auth/guest")
+        .post(format!("{}/auth/guest", server.url()))
         .json(&serde_json::json!({"name": "TestUser"}))
         .send()
         .await
