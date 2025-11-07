@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -22,6 +23,24 @@ final backendHealthProvider = FutureProvider<bool>((ref) async {
 });
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Lock orientation to portrait for mobile game
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // Configure system UI overlay style for Android
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
+
   runApp(
     const ProviderScope(
       child: FlipzyApp(),
@@ -56,62 +75,126 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Flipzy'),
         centerTitle: true,
+        elevation: 0,
       ),
-      body: Center(
-        child: healthStatus.when(
-          data: (isConnected) {
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  isConnected ? Icons.check_circle : Icons.error,
-                  size: 64,
-                  color: isConnected ? Colors.green : Colors.red,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  isConnected
-                      ? 'Flipzy — Connected to backend'
-                      : 'Disconnected',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'API Endpoint: ${Config.apiEndpoint}',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
-                    ref.invalidate(backendHealthProvider);
-                  },
-                  child: const Text('Retry Connection'),
-                ),
-              ],
-            );
-          },
-          loading: () => const CircularProgressIndicator(),
-          error: (err, stack) => Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error, size: 64, color: Colors.red),
-              const SizedBox(height: 24),
-              const Text(
-                'Disconnected',
-                style: TextStyle(fontSize: 24),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Center(
+            child: healthStatus.when(
+              data: (isConnected) {
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isConnected ? Icons.check_circle : Icons.error,
+                      size: 80,
+                      color: isConnected ? Colors.green : Colors.red,
+                    ),
+                    const SizedBox(height: 32),
+                    Text(
+                      isConnected
+                          ? 'Flipzy — Connected to backend'
+                          : 'Disconnected',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'API: ${Config.apiEndpoint}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontFamily: 'monospace',
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          ref.invalidate(backendHealthProvider);
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry Connection'),
+                        style: ElevatedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+              loading: () => Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Connecting to server...',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              Text('Error: $err'),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  ref.invalidate(backendHealthProvider);
-                },
-                child: const Text('Retry Connection'),
+              error: (err, stack) => Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 80, color: Colors.red),
+                  const SizedBox(height: 32),
+                  Text(
+                    'Connection Failed',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Text(
+                      'Error: $err',
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        ref.invalidate(backendHealthProvider);
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry Connection'),
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

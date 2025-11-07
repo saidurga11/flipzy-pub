@@ -1,6 +1,6 @@
 # Flipzy
 
-A mobile game monorepo with Rust backend and Flutter client.
+A mobile game monorepo with Rust backend and Flutter client, optimized for Android.
 
 ## Project Structure
 
@@ -16,6 +16,31 @@ flipzy/
 - **Rust**: >= 1.70 ([Install Rust](https://rustup.rs/))
 - **Flutter**: >= 3.7 stable ([Install Flutter](https://flutter.dev/docs/get-started/install))
 - **Docker & Docker Compose**: For running infrastructure ([Install Docker](https://docs.docker.com/get-docker/))
+- **Android Studio**: For Android development ([Install Android Studio](https://developer.android.com/studio))
+  - Android SDK (API 24+)
+  - Android Emulator or physical device
+
+## Android-Specific Setup
+
+This project is optimized for Android mobile development with the following configurations:
+
+### Device Requirements
+- Minimum SDK: 24 (Android 7.0 Nougat)
+- Target SDK: 34 (Android 14)
+- Portrait orientation locked
+
+### Automatic Network Configuration
+The app automatically detects Android and uses the correct API endpoint:
+- **Android Emulator**: `http://10.0.2.2:8080` (auto-configured)
+- **Physical Device**: Configure network to access host machine
+- **iOS/Other**: `http://localhost:8080`
+
+### Mobile Features
+- Portrait-only orientation for optimal game experience
+- SafeArea handling for notched devices
+- Touch-optimized UI with 50dp minimum touch targets
+- Transparent status bar with proper icon colors
+- Internet and network state permissions configured
 
 ## Quick Start
 
@@ -34,17 +59,40 @@ This will:
 
 The server will be available at `http://localhost:8080`
 
-### 2. Run the Flutter Client
+### 2. Run the Flutter Client (Android)
 
 In a separate terminal:
 
 ```bash
 cd client
 flutter pub get
+```
+
+**Option A: Android Emulator (Recommended for Development)**
+```bash
+# List available devices
+flutter devices
+
+# Run on Android emulator
+flutter run -d emulator-5554
+# Or simply
 flutter run
 ```
 
-The app will connect to the backend and display "Flipzy — Connected to backend" if successful.
+**Option B: Physical Android Device**
+1. Enable Developer Options and USB Debugging on your device
+2. Connect via USB
+3. Accept the connection prompt on your device
+4. Run:
+```bash
+flutter run
+```
+
+The app will:
+- Automatically connect to `http://10.0.2.2:8080` on Android emulator
+- Display "Flipzy — Connected to backend" when successful
+- Lock to portrait orientation
+- Show a mobile-optimized UI
 
 ## Development
 
@@ -85,33 +133,60 @@ The server uses the following environment variables (defined in `server/.env`):
   - Returns: `{"token": "<jwt>", "user_id": "u-<uuid>"}`
   - Token expires in 24 hours
 
-### Flutter Client
+### Flutter Client (Android)
 
-#### Running on Different Devices
+#### Building for Release
 
 ```bash
-# Android
+cd client
+
+# Build APK for distribution
+flutter build apk --release
+
+# Build App Bundle for Play Store
+flutter build appbundle --release
+
+# Build and install debug APK
+flutter build apk --debug
+adb install build/app/outputs/flutter-apk/app-debug.apk
+```
+
+#### Running on Different Targets
+
+```bash
+# Android (primary target)
 cd client
 flutter run -d android
 
-# iOS (requires macOS)
-cd client
-flutter run -d ios
+# Specific device
+flutter run -d <device-id>
 
-# Web
-cd client
-flutter run -d chrome
+# Release mode
+flutter run --release
 ```
 
 #### Configuration
 
-The API endpoint is configured in `client/lib/config.dart`. By default, it points to `http://localhost:8080`.
+The API endpoint is configured in `client/lib/config.dart` with automatic platform detection:
+- **Android**: Automatically uses `http://10.0.2.2:8080` for emulator
+- **Others**: Defaults to `http://localhost:8080`
 
-To change the API endpoint at runtime:
+To override the API endpoint:
 
 ```bash
-flutter run --dart-define=API_ENDPOINT=http://your-server:8080
+# For production server
+flutter run --dart-define=API_ENDPOINT=http://your-production-server:8080
+
+# For physical device accessing local network
+flutter run --dart-define=API_ENDPOINT=http://192.168.1.100:8080
 ```
+
+#### Android-Specific Configuration Files
+
+- `android/app/src/main/AndroidManifest.xml` - Permissions and app config
+- `android/app/build.gradle` - Build settings (minSdk: 24, targetSdk: 34)
+- `android/build.gradle` - Project-level dependencies
+- `android/gradle.properties` - Gradle JVM settings
 
 #### Dependencies
 
@@ -199,18 +274,66 @@ docker-compose down -v
    docker ps
    ```
 
-### Client shows "Disconnected"
+### Android Client shows "Disconnected"
 
-1. Verify the server is running:
+1. **Verify the server is running:**
    ```bash
    curl http://localhost:8080/health
    ```
 
-2. Check the API endpoint in `client/lib/config.dart`
+2. **Check network configuration:**
+   - On Android emulator: App automatically uses `http://10.0.2.2:8080`
+   - On physical device: Make sure device is on same network as host
+   - Check `client/lib/config.dart` for endpoint configuration
 
-3. On Android emulator, use `http://10.0.2.2:8080` instead of `localhost`
+3. **Test emulator network:**
+   ```bash
+   # From host machine
+   adb shell
+   # Inside emulator shell
+   curl http://10.0.2.2:8080/health
+   ```
 
-4. On iOS simulator, `localhost` should work
+4. **For physical Android device on local network:**
+   ```bash
+   # Find your host machine's local IP
+   ifconfig | grep "inet " | grep -v 127.0.0.1
+   # or on Windows
+   ipconfig
+
+   # Run app with your local IP
+   flutter run --dart-define=API_ENDPOINT=http://192.168.1.x:8080
+   ```
+
+5. **Check Android permissions:**
+   - Ensure `INTERNET` permission is in `AndroidManifest.xml` (already configured)
+   - Check if `usesCleartextTraffic="true"` is set (required for HTTP)
+
+### Flutter/Android Build Issues
+
+1. **Gradle build fails:**
+   ```bash
+   cd client/android
+   ./gradlew clean
+   cd ../..
+   flutter clean
+   flutter pub get
+   ```
+
+2. **SDK not found:**
+   - Set `ANDROID_HOME` environment variable
+   - Accept Android licenses: `flutter doctor --android-licenses`
+
+3. **Device not detected:**
+   ```bash
+   # Check connected devices
+   flutter devices
+   adb devices
+
+   # Restart ADB if needed
+   adb kill-server
+   adb start-server
+   ```
 
 ### Database connection issues
 
